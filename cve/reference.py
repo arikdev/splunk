@@ -10,34 +10,19 @@ import re
 #zipfile = ZipFile(BytesIO(response.content)) 
 
 counter = 0
+files_list = []
 
 def handle_patch(patch):
     with open(patch,"r") as f:
         lines = f.readlines();
         data = ''.join(lines)
         words = re.split('\s+', data)
-        print("------------------------------------------")
         for word in words:
           if '.c' in word:
-              print("===")
-              print(word)
-              #files = re.findall(r'(\w+\.c)[^a-z]', word)
               files = re.findall(r'(/[a-zA-Z0-9\/]*\w+\.c)[^a-z]', word)
               for file in files:
                   print('>>>>>>>>>>>>>>' + file)
-        #for line in lines:
-          #words = line.split(' ')
-          #for word in words:
-              #pat = "([a-zA-Z-.\/]+.c)"
-              #c = re.findall(pat,word)
-              #print(c)
-              #continue
-              #if '.c' in word:
-                  #tmp = word
-                  #index = word.index('.c')
-                  #print("index:"+ str(index) + " l:" + str(len(word)))
-                  #print(':<' + word + '>:')
-                  #print(':<' + tmp + '>:')
+                  files_list.append(file)
 
 def handle_ref(cve_id, r):
     global counter
@@ -55,13 +40,8 @@ def handle_ref(cve_id, r):
         return
     counter = counter + 1
     print('------' + cve_id + ': ' + str(counter) + '------------------------------------------------------------------')
-    print(url)
-    f.write('#' + str(counter) + ' ' + cve_id + ' ' + url + '\n')
-    f.flush()
     response = requests.get(url)
-    print(type(response.content))
-    print(response.content)
-    #handle_patch(response.content)
+    handle_patch(response.content)
 
 def func(data):
   for item in data["CVE_Items"]:
@@ -80,9 +60,6 @@ def func(data):
 
 f = open("cve_log.txt", "w")
 
-handle_patch('url1')
-sys.exit()
-
 with ZipFile('nvdcve-1.1-2020.json.zip', 'r') as zip:
   for i in zip.namelist():
     if i == "nvdcve-1.1-2020.json":
@@ -90,3 +67,6 @@ with ZipFile('nvdcve-1.1-2020.json.zip', 'r') as zip:
       func(data)
       break
 f.close()
+
+files_set = set(files_list)
+print(files_set)
