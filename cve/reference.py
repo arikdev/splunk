@@ -13,16 +13,19 @@ counter = 0
 files_list = []
 
 def handle_patch(patch):
-    with open(patch,"r") as f:
-        lines = f.readlines();
-        data = ''.join(lines)
-        words = re.split('\s+', data)
-        for word in words:
-          if '.c' in word:
-              files = re.findall(r'(/[a-zA-Z0-9\/]*\w+\.c)[^a-z]', word)
-              for file in files:
-                  print('>>>>>>>>>>>>>>' + file)
-                  files_list.append(file)
+    #lines = f.readlines();
+    #data = ''.join(lines)
+    print('--------------------  PATCH --------------------------------------------------------------------')
+    print(type(patch))
+    print(patch)
+    str_patch = str(patch, 'utf-8')
+    words = re.split('\s+', str_patch)
+    for word in words:
+        if '.c' in word:
+           files = re.findall(r'(/[a-zA-Z0-9\/]*\w+\.c)[^a-z]', word)
+           for file in files:
+               print('>>>>>>>>>>>>>>' + file)
+               files_list.append(file)
 
 def handle_ref(cve_id, r):
     global counter
@@ -39,11 +42,11 @@ def handle_ref(cve_id, r):
     if 'commit' not in url:
         return
     counter = counter + 1
-    print('------' + cve_id + ': ' + str(counter) + '------------------------------------------------------------------')
+    print('----------------------' + cve_id + ': ' + str(counter) + '--------------------------------------------------------')
     response = requests.get(url)
     handle_patch(response.content)
 
-def func(data):
+def handle_feed(data):
   for item in data["CVE_Items"]:
     if 'cve' not in item:
         continue
@@ -60,12 +63,22 @@ def func(data):
 
 f = open("cve_log.txt", "w")
 
-with ZipFile('nvdcve-1.1-2020.json.zip', 'r') as zip:
-  for i in zip.namelist():
-    if i == "nvdcve-1.1-2020.json":
-      data = json.loads(zip.read(i))
-      func(data)
-      break
+suffixes = [
+    "2020",
+]
+
+for suffix in suffixes:
+    url = 'https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-%s.json.zip' % suffix
+    response = requests.get(url)
+    data = {}
+    zipfile = ZipFile(BytesIO(response.content))
+
+    for i in zipfile.namelist():
+      if i == "nvdcve-1.1-%s.json" % suffix :
+        data = json.loads(zipfile.read(i))
+        break
+    handle_feed(data)
+
 f.close()
 
 files_set = set(files_list)
