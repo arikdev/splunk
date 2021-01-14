@@ -5,27 +5,25 @@ import json
 import sys
 import re
 
-#url = 'https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-%s.json.zip' % '2020'
-#response = requests.get(url)
-#zipfile = ZipFile(BytesIO(response.content)) 
-
 counter = 0
-files_list = []
+res = {}
+files_found = 0
 
-def handle_patch(patch):
-    #lines = f.readlines();
-    #data = ''.join(lines)
-    print('--------------------  PATCH --------------------------------------------------------------------')
-    print(type(patch))
-    print(patch)
+def handle_patch(cve_id, patch):
+    global files_found
     str_patch = str(patch, 'utf-8')
     words = re.split('\s+', str_patch)
     for word in words:
-        if '.c' in word:
-           files = re.findall(r'(/[a-zA-Z0-9\/]*\w+\.c)[^a-z]', word)
-           for file in files:
-               print('>>>>>>>>>>>>>>' + file)
-               files_list.append(file)
+        if '.c' or '.h' in word:
+            files = re.findall(r'(/[a-zA-Z0-9\/]*\w+\.[ch])[^a-z]', word)
+            for file in files:
+                if cve_id not in res:
+                    res[cve_id] = []
+                if file not in res[cve_id]:
+                    print('>>>>>>>>>>>>>>' + file)
+                    res[cve_id].append(file)
+                    files_found += 1
+
 
 def handle_ref(cve_id, r):
     global counter
@@ -39,20 +37,27 @@ def handle_ref(cve_id, r):
     url = r['url']
     if 'git' not in url:
         return
+
     if 'commit' not in url:
         return
     counter = counter + 1
     print('----------------------' + cve_id + ': ' + str(counter) + '--------------------------------------------------------')
     print(url)
-    response = requests.get(url)
-    handle_patch(response.content)
+    try:
+      response = requests.get(url)
+    except:
+      print('Eeception URL:' + url)
+      return
+    handle_patch(cve_id, response.content)
 
 def handle_feed(data):
   for item in data["CVE_Items"]:
+    #if files_found > 100:
+        #break
     if 'cve' not in item:
         continue
     cve = item['cve']
-    if 'references' not in cve: 
+    if 'references' not in cve:
         continue
     references = cve['references']
     cve_meta_data = cve['CVE_data_meta']
@@ -66,24 +71,25 @@ f = open("cve_log.txt", "w")
 
 suffixes = [
     "2020",
+    "2019",
 ]
 
 for suffix in suffixes:
     url = 'https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-%s.json.zip' % suffix
-    try:
-      response = requests.get(url)
-    except:
-      print('Eeception URL:' + url)
+    response = requests.get(url)
     data = {}
     zipfile = ZipFile(BytesIO(response.content))
 
     for i in zipfile.namelist():
-      if i == "nvdcve-1.1-%s.json" % suffix :
+      if i == "nvdcve-1.1-%s.json" % suffix:
         data = json.loads(zipfile.read(i))
         break
     handle_feed(data)
 
+print("RES:")
+f.write("RES:\n")
+print(res)
 f.close()
 
-files_set = set(files_list)
-print(files_set)
+with open('source_files.json', 'w') as f:
+    json.dump(res, f)
