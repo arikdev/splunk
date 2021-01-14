@@ -43,6 +43,7 @@ def handle_ref(cve_id, r):
         return
     counter = counter + 1
     print('----------------------' + cve_id + ': ' + str(counter) + '--------------------------------------------------------')
+    print(url)
     response = requests.get(url)
     handle_patch(response.content)
 
@@ -69,7 +70,10 @@ suffixes = [
 
 for suffix in suffixes:
     url = 'https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-%s.json.zip' % suffix
-    response = requests.get(url)
+    try:
+      response = requests.get(url)
+    except:
+      print('Eeception URL:' + url)
     data = {}
     zipfile = ZipFile(BytesIO(response.content))
 
