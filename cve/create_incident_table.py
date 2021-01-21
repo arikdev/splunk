@@ -50,6 +50,20 @@ def handle_cve(item, part, vendor, product, version, cves):
                 cves.append(cve_id)
                 found = True
                 continue
+            if cur_version == '*':
+                startIncluding = None
+                endIncluding = None
+                if 'versionStartIncluding' in match:
+                    startIncluding = match['versionStartIncluding']
+                    print('startIncluding:' + startIncluding)
+                if 'versionEndIncluding' in match:
+                    startIncluding = match['versionEndIncluding']
+                    print('endIncluding:' + startIncluding + ' ' + cve_id)
+                if startIncluding is None and endIncluding is None:
+                    print(">>>> Found * version : " + cve_id + " " + cur_version)
+                    cves.append(cve_id)
+                    found = True
+
             #print(version + ' ' + cur_version)
             #if version == '-':
                 #print(tokens)
