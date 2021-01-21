@@ -20,6 +20,26 @@ service = client.connect(
 
 index = 'cve'
 
+def version_cmp(ver1, ver2):
+    parts1 = [int(x) for x in ver1.split('.')]
+    parts2 = [int(x) for x in ver2.split('.')]
+
+    len_diff = len(parts1) - len(parts2)
+    if len_diff > 0:
+        for i in range(len_diff):
+            parts2.append(0)
+    if len_diff < 0:
+        for i in range(-len_diff):
+            parts1.append(0)
+
+    for i in range(len(parts1)):
+        if parts1[i] > parts2[i]:
+            return 1
+        if parts2[i] > parts1[i]:
+            return -1
+
+    return 0
+
 def handle_cve(item, part, vendor, product, version, cves):
     cve_item = json.loads(item)
     cve = cve_item['cve']
@@ -49,7 +69,7 @@ def handle_cve(item, part, vendor, product, version, cves):
                 print(">>>> Found direct version : " + cve_id + " " + cur_version)
                 cves.append(cve_id)
                 found = True
-                continue
+                break
             if cur_version == '*':
                 startIncluding = None
                 endIncluding = None
@@ -63,6 +83,8 @@ def handle_cve(item, part, vendor, product, version, cves):
                     print(">>>> Found * version : " + cve_id + " " + cur_version)
                     cves.append(cve_id)
                     found = True
+                    break
+                print('>>>>>> start:' + str(startIncluding) + ' end:' + str(endIncluding))
 
             #print(version + ' ' + cur_version)
             #if version == '-':
@@ -90,4 +112,5 @@ def get_cves(part, vendor, product, version):
     return cves
 
 cves = get_cves('o', 'linux', 'linux_kernel', '5.4')
+print(len(cves))
 print(cves)
