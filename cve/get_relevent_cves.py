@@ -27,7 +27,7 @@ def get_cves(cpe_part, cpe_vendor, cpe_product, cpe_version):
             if id in cves:
                 continue
             cves.append(id)
-            print(item)
+            print(json.dumps(item))
         start_index += total_results
 
 def get_cpe_fields(cpe_id):
