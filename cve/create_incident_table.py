@@ -8,10 +8,11 @@ import splunklib.results as results
 from splunklib.searchcommands import dispatch, StreamingCommand, Configuration, Option, validators
 import csv_tools as csv
 
-CVS_HOME = '/home/manage/splunk/etc/apps/lookup_editor/lookups/'
+CSV_HOME = '/home/manage/splunk/etc/apps/lookup_editor/lookups/'
 CPE_TABLE = 'vul_cpe.csv'
 PRODUCT_TABLE = 'vul_product_table.csv'
 PRODUCT_CPE_TABLE = 'vul_product_cpe.csv'
+INCIDENT_TABLE = 'vul_incidents.csv'
 
 HOST = "localhost"
 PORT = 8089
@@ -162,13 +163,13 @@ class Cpe_file(csv.CSV_FILE):
 product_db = {}
 cpe_db = {}
 def init_db():
-    product_file = Product_file(CVS_HOME + PRODUCT_TABLE)
+    product_file = Product_file(CSV_HOME + PRODUCT_TABLE)
     product_file.process()
 
-    product_cpe_file = Product_cpe_file(CVS_HOME + PRODUCT_CPE_TABLE)
+    product_cpe_file = Product_cpe_file(CSV_HOME + PRODUCT_CPE_TABLE)
     product_cpe_file.process()
 
-    cpe_file = Cpe_file(CVS_HOME + CPE_TABLE)
+    cpe_file = Cpe_file(CSV_HOME + CPE_TABLE)
     cpe_file.process()
 
 def dump_db():
@@ -176,7 +177,7 @@ def dump_db():
     #print(cpe_db)
     for product_id,product_info in product_db.items():
         print('-----------------------')
-        print(product_id)
+        print('product id:' + product_id)
         for cpe_id, cpe_info in product_info.items():
             print(cpe_id)
             version = cpe_info['version']
@@ -202,3 +203,9 @@ for product_id,product_info in product_db.items():
             get_cves(cves, variant['part'], variant['vendor'], variant['product'], version)
 
 dump_db()
+
+incident = csv.CSV_FILE(CSV_HOME + INCIDENT_TABLE )
+myCsv = incident.to_dic();
+for csv in myCsv:
+    print(csv)
+
