@@ -6,7 +6,7 @@ from time import sleep
 import splunklib.client as client
 import splunklib.results as results
 from splunklib.searchcommands import dispatch, StreamingCommand, Configuration, Option, validators
-import csv
+import csv_tools as csv
 
 CVS_HOME = '/home/manage/splunk/etc/apps/lookup_editor/lookups/'
 CPE_TABLE = 'vul_cpe.csv'
@@ -45,24 +45,6 @@ def version_cmp(ver1, ver2):
             return -1
 
     return 0
-
-class CSV_FILE:
-    def __init__(self, file_name):
-        self.file_name = file_name
-
-    def implementation(self, tokens):
-        print("No implemantation !!!!!")
-
-    def process(self):
-        with open(self.file_name, 'r') as fp:
-            first = True
-            for line in fp:
-                if first:  # If the header of the csv
-                    first = False
-                    continue
-                line = line[:-1]
-                tokens = line.split(',')
-                self.implementation(tokens)
 
 def handle_cve(item, part, vendor, product, version, cves):
     cve_item = json.loads(item)
@@ -142,12 +124,12 @@ def get_cpe_variants(cpe):
 #   list of all relevant CVEs
 # build the product DB
 
-class Product_file(CSV_FILE):
+class Product_file(csv.CSV_FILE):
     def implementation(self, tokens):
         global product_db
         product_db[tokens[0]] = {}
 
-class Product_cpe_file(CSV_FILE):
+class Product_cpe_file(csv.CSV_FILE):
     def implementation(self, tokens):
         global product_db
         product_id = tokens[0]
@@ -164,7 +146,7 @@ class Product_cpe_file(CSV_FILE):
         cpe_entry['version'] = version
         cpe_entry['cves'] = []
 
-class Cpe_file(CSV_FILE):
+class Cpe_file(csv.CSV_FILE):
     def implementation(self, tokens):
         global cpe_db
         cpe_id = tokens[0]
