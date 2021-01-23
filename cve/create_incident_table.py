@@ -6,6 +6,12 @@ from time import sleep
 import splunklib.client as client
 import splunklib.results as results
 from splunklib.searchcommands import dispatch, StreamingCommand, Configuration, Option, validators
+import csv
+
+CVS_HOME = '/home/manage/splunk/etc/apps/lookup_editor/lookups/'
+CPE_TABLE = 'vul_cpe.csv'
+PRODUCT_TABLE = 'vul_product_table.csv'
+PRODUCT_CPE_TABLE = 'vul_product_cpe.csv'
 
 HOST = "localhost"
 PORT = 8089
@@ -66,34 +72,31 @@ def handle_cve(item, part, vendor, product, version, cves):
                 continue
             cur_version = tokens[5]
             if cur_version.find(version) != -1:
-                print(">>>> Found direct version : " + cve_id + " " + cur_version)
                 cves.append(cve_id)
                 found = True
                 break
+            if cur_version == '-':
+                print('----------------------------- cve:' + cve_id)
             if cur_version == '*':
                 startIncluding = None
                 endIncluding = None
                 if 'versionStartIncluding' in match:
                     startIncluding = match['versionStartIncluding']
-                    print('startIncluding:' + startIncluding)
+                    #print('startIncluding:' + startIncluding)
+                    if version_cmp(version, startIncluding) == -1:
+                        continue;
                 if 'versionEndIncluding' in match:
-                    startIncluding = match['versionEndIncluding']
-                    print('endIncluding:' + startIncluding + ' ' + cve_id)
-                if startIncluding is None and endIncluding is None:
-                    print(">>>> Found * version : " + cve_id + " " + cur_version)
-                    cves.append(cve_id)
-                    found = True
-                    break
-                print('>>>>>> start:' + str(startIncluding) + ' end:' + str(endIncluding))
-
-            #print(version + ' ' + cur_version)
-            #if version == '-':
-                #print(tokens)
+                    endIncluding = match['versionEndIncluding']
+                    #print('endIncluding:' + endIncluding + ' ' + cve_id)
+                    if version_cmp(version, endIncluding) == 1:
+                        continue;
+                cves.append(cve_id)
+                found = True
+                break
 
     return cves
 
-def get_cves(part, vendor, product, version):
-    cves = []
+def get_cves(cves, part, vendor, product, version):
     search = f'search index="' + index + '" | search configurations.nodes{}.cpe_match{}.cpe23Uri="cpe:2.3:%s:%s:%s:*"' % (part, vendor, product)
     job = service.jobs.create(search)
     while True:
@@ -109,8 +112,97 @@ def get_cves(part, vendor, product, version):
         if '_raw' in item:
             handle_cve(item['_raw'], part, vendor, product, version, cves)
 
-    return cves
+def get_cpe_variants(cpe):
+    if cpe not in cpe_db:
+        return None
 
-cves = get_cves('o', 'linux', 'linux_kernel', '5.4')
-print(len(cves))
-print(cves)
+    return cpe_db[cpe]
+
+# Each product should contain the following:
+# List of dictionaries that contains:
+#   CPE ID 
+#   list of all relevant CVEs
+# build the product DB
+product_db = {}
+cpe_db = {}
+def init_db():
+    first = True
+    with open(CVS_HOME + PRODUCT_TABLE, 'r') as fp:
+        for line in fp:
+            if first: #If the header of the csv
+                first = False
+                continue
+            line = line[:-1]
+            tokens = line.split(',')
+            product_db[tokens[0]] = {}
+
+    first = True
+    with open(CVS_HOME + PRODUCT_CPE_TABLE, 'r') as fp:
+        for line in fp:
+            if first: #If the header of the csv
+                first = False
+                continue
+            line = line[:-1]
+            tokens = line.split(',')
+            product_id = tokens[0]
+            cpe_id = tokens[1]
+            version = tokens[2]
+            hw = tokens[3]
+            if product_id not in product_db:
+                print('ERROR: product :' + product_id)
+                continue
+            product_db[product_id] = {}
+            product_entry = product_db[product_id]
+            product_entry[cpe_id] = {}
+            cpe_entry = product_entry[cpe_id];
+            cpe_entry['version'] = version
+            cpe_entry['cves'] = []
+
+    first = True
+    with open(CVS_HOME + CPE_TABLE, 'r') as fp:
+        for line in fp:
+            if first: #If the header of the csv
+                first = False
+                continue
+            line = line[:-1]
+            tokens = line.split(',')
+            cpe_id = tokens[0]
+            if cpe_id not in cpe_db:
+                cpe_db[cpe_id] = []
+            cpe_entry = cpe_db[cpe_id]
+            cpe_info = {}
+            cpe_info['part'] = tokens[1]
+            cpe_info['vendor']= tokens[2]
+            cpe_info['product'] = tokens[3]
+            cpe_entry.append(cpe_info)
+
+def dump_db():
+    print(product_db)
+    #print(cpe_db)
+    for product_id,product_info in product_db.items():
+        print('-----------------------')
+        print(product_id)
+        for cpe_id, cpe_info in product_info.items():
+            print(cpe_id)
+            version = cpe_info['version']
+            cves = cpe_info['cves']
+            cpe_variants = get_cpe_variants(cpe_id)
+            for variant in cpe_variants:
+                print('++++')
+                print(variant['part'])
+                print(variant['vendor'])
+                print(variant['product'])
+                print(version)
+                print(cves)
+    
+init_db()
+
+for product_id,product_info in product_db.items():
+    for cpe_id, cpe_info in product_info.items():
+        version = cpe_info['version']
+        cves = cpe_info['cves']
+        cpe_variants = get_cpe_variants(cpe_id)
+        for variant in cpe_variants:
+            get_cves(cves, variant['part'], variant['vendor'], variant['product'], version)
+
+dump_db()
