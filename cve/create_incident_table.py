@@ -46,6 +46,24 @@ def version_cmp(ver1, ver2):
 
     return 0
 
+class CSV_FILE:
+    def __init__(self, file_name):
+        self.file_name = file_name
+
+    def implementation(self, tokens):
+        print("No implemantation !!!!!")
+
+    def process(self):
+        with open(self.file_name, 'r') as fp:
+            first = True
+            for line in fp:
+                if first:  # If the header of the csv
+                    first = False
+                    continue
+                line = line[:-1]
+                tokens = line.split(',')
+                self.implementation(tokens)
+
 def handle_cve(item, part, vendor, product, version, cves):
     cve_item = json.loads(item)
     cve = cve_item['cve']
@@ -123,61 +141,56 @@ def get_cpe_variants(cpe):
 #   CPE ID 
 #   list of all relevant CVEs
 # build the product DB
+
+class Product_file(CSV_FILE):
+    def implementation(self, tokens):
+        global product_db
+        product_db[tokens[0]] = {}
+
+class Product_cpe_file(CSV_FILE):
+    def implementation(self, tokens):
+        global product_db
+        product_id = tokens[0]
+        cpe_id = tokens[1]
+        version = tokens[2]
+        hw = tokens[3]
+        if product_id not in product_db:
+           print('ERROR: product :' + product_id)
+           return
+        product_db[product_id] = {}
+        product_entry = product_db[product_id]
+        product_entry[cpe_id] = {}
+        cpe_entry = product_entry[cpe_id];
+        cpe_entry['version'] = version
+        cpe_entry['cves'] = []
+
+class Cpe_file(CSV_FILE):
+    def implementation(self, tokens):
+        global cpe_db
+        cpe_id = tokens[0]
+        if cpe_id not in cpe_db:
+           cpe_db[cpe_id] = []
+        cpe_entry = cpe_db[cpe_id]
+        cpe_info = {}
+        cpe_info['part'] = tokens[1]
+        cpe_info['vendor']= tokens[2]
+        cpe_info['product'] = tokens[3]
+        cpe_entry.append(cpe_info)
+
 product_db = {}
 cpe_db = {}
 def init_db():
-    first = True
-    with open(CVS_HOME + PRODUCT_TABLE, 'r') as fp:
-        for line in fp:
-            if first: #If the header of the csv
-                first = False
-                continue
-            line = line[:-1]
-            tokens = line.split(',')
-            product_db[tokens[0]] = {}
+    product_file = Product_file(CVS_HOME + PRODUCT_TABLE)
+    product_file.process()
 
-    first = True
-    with open(CVS_HOME + PRODUCT_CPE_TABLE, 'r') as fp:
-        for line in fp:
-            if first: #If the header of the csv
-                first = False
-                continue
-            line = line[:-1]
-            tokens = line.split(',')
-            product_id = tokens[0]
-            cpe_id = tokens[1]
-            version = tokens[2]
-            hw = tokens[3]
-            if product_id not in product_db:
-                print('ERROR: product :' + product_id)
-                continue
-            product_db[product_id] = {}
-            product_entry = product_db[product_id]
-            product_entry[cpe_id] = {}
-            cpe_entry = product_entry[cpe_id];
-            cpe_entry['version'] = version
-            cpe_entry['cves'] = []
+    product_cpe_file = Product_cpe_file(CVS_HOME + PRODUCT_CPE_TABLE)
+    product_cpe_file.process()
 
-    first = True
-    with open(CVS_HOME + CPE_TABLE, 'r') as fp:
-        for line in fp:
-            if first: #If the header of the csv
-                first = False
-                continue
-            line = line[:-1]
-            tokens = line.split(',')
-            cpe_id = tokens[0]
-            if cpe_id not in cpe_db:
-                cpe_db[cpe_id] = []
-            cpe_entry = cpe_db[cpe_id]
-            cpe_info = {}
-            cpe_info['part'] = tokens[1]
-            cpe_info['vendor']= tokens[2]
-            cpe_info['product'] = tokens[3]
-            cpe_entry.append(cpe_info)
+    cpe_file = Cpe_file(CVS_HOME + CPE_TABLE)
+    cpe_file.process()
 
 def dump_db():
-    print(product_db)
+    #print(product_db)
     #print(cpe_db)
     for product_id,product_info in product_db.items():
         print('-----------------------')
@@ -193,7 +206,8 @@ def dump_db():
                 print(variant['vendor'])
                 print(variant['product'])
                 print(version)
-                print(cves)
+                for cve in cves:
+                    print(cve)
     
 init_db()
 
