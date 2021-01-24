@@ -97,6 +97,7 @@ def handle_cve(item, part, vendor, product, version, cves):
 
     return cves
 
+# Get CVES that match CPE from the splunk
 def get_cves(cves, part, vendor, product, version):
     search = f'search index="' + index + '" | search configurations.nodes{}.cpe_match{}.cpe23Uri="cpe:2.3:%s:%s:%s:*"' % (part, vendor, product)
     job = service.jobs.create(search)
@@ -204,8 +205,12 @@ for product_id,product_info in product_db.items():
 
 dump_db()
 
-incident = csv.CSV_FILE(CSV_HOME + INCIDENT_TABLE )
+incident = csv.CSV_FILE(CSV_HOME + INCIDENT_TABLE)
+
+#Load the content of incident table to a dictionary
 myCsv = incident.to_dic();
 for csv in myCsv:
     print(csv)
+
+
 
