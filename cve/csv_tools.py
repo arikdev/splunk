@@ -1,3 +1,5 @@
+names = []
+
 class CSV_FILE:
     def __init__(self, file_name):
         self.file_name = file_name
@@ -18,6 +20,7 @@ class CSV_FILE:
 
     def to_dic(self):
         csv = []
+        global names
         names = []
         with open(self.file_name, 'r') as fp:
             first = True
@@ -39,3 +42,7 @@ class CSV_FILE:
     
         return csv
 
+
+    def insert_dic_line(self, csv, values):
+        new_dic = dict(zip(names, values))
+        csv.append(new_dic)

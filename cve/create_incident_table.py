@@ -192,6 +192,26 @@ def dump_db():
                 print(version)
                 for cve in cves:
                     print(cve)
+
+def get_incident(incidents_db, product_id, cve, cpe, version):
+    for incident in incidents_db:
+        if 'CVE' not in incident:
+            continue
+        if 'CPE' not in incident:
+            continue
+        if 'Version' not in incident:
+            continue
+        if 'Product_id' not in incident:
+            continue
+        if cve == incident['CVE'] and cpe == incident['CPE'] and version == incident['Version'] and product_id == incident['Product_id']:
+            return incident
+
+    return None
+
+def insert_incident(incident_file, incidents, product_id, cve, cpe, version):
+    incident_values = []
+    incidents_file.insert_dic_line(incidents, incident_values)
+
     
 init_db()
 
@@ -203,14 +223,35 @@ for product_id,product_info in product_db.items():
         for variant in cpe_variants:
             get_cves(cves, variant['part'], variant['vendor'], variant['product'], version)
 
-dump_db()
+#dump_db()
 
-incident = csv.CSV_FILE(CSV_HOME + INCIDENT_TABLE)
+incident_file = csv.CSV_FILE(CSV_HOME + INCIDENT_TABLE)
 
 #Load the content of incident table to a dictionary
-myCsv = incident.to_dic();
-for csv in myCsv:
-    print(csv)
+#The matchin fileds in the incident table is product_id,cve,cpe,version
+incidents = incident_file.to_dic();
+product_id
+print('----------------------------------------------------')
+res = get_incident(incidents, '1', 'CVE-2022-9041', 'linux:kernel', '5.4')
+print(res)
+sys.exit()
 
-
-
+print('----------------------------------------------------')
+print(product_db)
+print('----------------------------------------------------')
+for product_id,product_info in product_db.items():
+    for cpe, cpe_info in product_info.items():
+        if 'version' not in cpe_info:
+            print('ERROR: no version in cpe: ' + cpe)
+            continue
+        if 'cves' not in cpe_info:
+            #nothing to do for this cpe.
+            continue
+        version = cpe_info['version']
+        cves = cpe_info['cves']
+        for cve in cves:
+            print('key: ' + product_id + ',' +  cve + ',' + cpe + ',' + version)
+            res = get_incident(incidents, product_id, cve, cpe, version)
+            if res is not None:
+                continue
+            #insert_incident(incident_file, incidents, product_id, cve, cpe, version)
