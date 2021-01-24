@@ -2,6 +2,8 @@ from datetime import datetime
 import requests
 import json
 
+# The program is run by splunk. It loads all the CVEs that are related to relevant CPEs
+
 CVS_HOME = '/home/manage/splunk/etc/apps/lookup_editor/lookups/'
 CPE_TABLE = 'vul_cpe.csv'
 PRODUCT_CPE_TABLE = 'vul_product_cpe.csv'
