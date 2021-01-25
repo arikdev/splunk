@@ -12,16 +12,16 @@ cves = []
 
 def get_cves(cpe_part, cpe_vendor, cpe_product, cpe_version):
     start_index = 0
-    prev_results = 0
+    result_per_page = 128
+    total_items_read = 0
     while True:
-        r = requests.get(f'https://services.nvd.nist.gov/rest/json/cves/1.0?startIndex=%d&resultsPerPage=1024&cpeMatchString=cpe:2.3:%s:%s:%s:%s' % (start_index, cpe_part, cpe_vendor, cpe_product, cpe_version))
+        r = requests.get(f'https://services.nvd.nist.gov/rest/json/cves/1.0?startIndex=%d&resultsPerPage=%s&cpeMatchString=cpe:2.3:%s:%s:%s:%s' % (start_index, result_per_page, cpe_part, cpe_vendor, cpe_product, cpe_version))
         j = json.loads(r.text)
         total_results = j['totalResults']
-        if total_results == prev_results:
-            break;
-        prev_results = total_results
         result = j['result']
         items = result['CVE_Items']
+        items_read = len(items)
+        total_items_read += items_read
         for item in items:
             cve = item['cve']
             meta_data = cve['CVE_data_meta']
@@ -30,7 +30,9 @@ def get_cves(cpe_part, cpe_vendor, cpe_product, cpe_version):
                 continue
             cves.append(id)
             print(json.dumps(item))
-        start_index += total_results
+        if total_items_read >= total_results:
+            break;
+        start_index += items_read
 
 def get_cpe_fields(cpe_id):
     first = True
