@@ -34,8 +34,9 @@ def handle_commit(cve_id, url):
        info['files'] = []
        info['commits'] = []
        res[cve_id] = info
-    res[cve_id]['commits'].append(commit_id)
-    f.write('>>>>>COMMIT ' + commit_id + '\n')
+    if commit_id not in res[cve_id]['commits']:
+        res[cve_id]['commits'].append(commit_id)
+        f.write('>>>>>COMMIT ' + commit_id + ' from url: ' + url + '\n')
 
 
 def handle_patch(cve_id, url, str_patch):
@@ -111,9 +112,6 @@ service = client.connect(
   port=PORT,
   username=USERNAME,
   password=PASSWORD)
-
-
-#handle_feed(data)
 
 search = 'search index="' + index +'"'
 job = service.jobs.create(search, max_count=4096)
