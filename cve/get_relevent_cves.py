@@ -1,10 +1,11 @@
 from datetime import datetime
 import requests
 import json
+import csv_tools as csv
 
 # The program is run by splunk. It loads all the CVEs that are related to relevant CPEs
 
-CVS_HOME = '/home/manage/splunk/etc/apps/lookup_editor/lookups/'
+CSV_HOME = '/home/manage/splunk/etc/apps/lookup_editor/lookups/'
 CPE_TABLE = 'vul_cpe.csv'
 PRODUCT_CPE_TABLE = 'vul_product_cpe.csv'
 
@@ -36,7 +37,7 @@ def get_cves(cpe_part, cpe_vendor, cpe_product, cpe_version):
 
 def get_cpe_fields(cpe_id):
     first = True
-    with open(CVS_HOME + CPE_TABLE, 'r') as fp:
+    with open(CSV_HOME + CPE_TABLE, 'r') as fp:
         for line in fp:
             if first: #If the header of the csv 
                 first = False
@@ -49,18 +50,8 @@ def get_cpe_fields(cpe_id):
 
     return 'None','None', 'None'
 
-f = open("cve_log.txt", "w")
-now = datetime.now()
-current_time = now.strftime("%H:%M:%S")
-f.write('------------------Started---------------:' + current_time + '\n')
-first = True
-with open(CVS_HOME + PRODUCT_CPE_TABLE, 'r') as fp:
-    for line in fp:
-        if first: #If the header of the csv 
-            first = False
-            continue 
-        line = line[:-1]
-        tokens = line.split(',')
+class Product_cpe_file(csv.CSV_FILE):
+    def implementation(self, tokens):
         product_id = tokens[0]
         cpe_id = tokens[1]
         version = tokens[2]
@@ -68,8 +59,16 @@ with open(CVS_HOME + PRODUCT_CPE_TABLE, 'r') as fp:
         part,vendor,product = get_cpe_fields(cpe_id)
         if part == 'None':
             f.write('ERROR: faild processing:'+ product_id + ' cpe:' + cpe_id + '\n')
-            continue
+            return
         get_cves(part, vendor, product, version)
+
+f = open("cve_log.txt", "w")
+now = datetime.now()
+current_time = now.strftime("%H:%M:%S")
+f.write('------------------Started---------------:' + current_time + '\n')
+
+product_cpe_file = Product_cpe_file(CSV_HOME + PRODUCT_CPE_TABLE)
+product_cpe_file.process()
 
 now = datetime.now()
 current_time = now.strftime("%H:%M:%S")
