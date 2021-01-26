@@ -10,6 +10,7 @@ CPE_TABLE = 'vul_cpe.csv'
 PRODUCT_CPE_TABLE = 'vul_product_cpe.csv'
 
 cves = []
+cpe_db = {}
 
 def get_cves(cpe_part, cpe_vendor, cpe_product, cpe_version):
     start_index = 0
@@ -35,20 +36,18 @@ def get_cves(cpe_part, cpe_vendor, cpe_product, cpe_version):
             break;
         start_index += items_read
 
-def get_cpe_fields(cpe_id):
-    first = True
-    with open(CSV_HOME + CPE_TABLE, 'r') as fp:
-        for line in fp:
-            if first: #If the header of the csv 
-                first = False
-                continue 
-            line = line[:-1]
-            tokens = line.split(',')
-            line_cpe_id = tokens[0]
-            if  line_cpe_id == cpe_id:
-                return tokens[1],tokens[2],tokens[3]
-
-    return 'None','None', 'None'
+class Cpe_file(csv.CSV_FILE):
+    def implementation(self, tokens):
+        global cpe_db
+        cpe_id = tokens[0]
+        if cpe_id not in cpe_db:
+           cpe_db[cpe_id] = []
+        cpe_entry = cpe_db[cpe_id]
+        cpe_info = {}
+        cpe_info['part'] = tokens[1]
+        cpe_info['vendor']= tokens[2]
+        cpe_info['product'] = tokens[3]
+        cpe_entry.append(cpe_info)
 
 class Product_cpe_file(csv.CSV_FILE):
     def implementation(self, tokens):
@@ -56,16 +55,17 @@ class Product_cpe_file(csv.CSV_FILE):
         cpe_id = tokens[1]
         version = tokens[2]
         f.write("--- Procssgin: " + product_id + ' ' + cpe_id + ' ' + version + '\n')
-        part,vendor,product = get_cpe_fields(cpe_id)
-        if part == 'None':
-            f.write('ERROR: faild processing:'+ product_id + ' cpe:' + cpe_id + '\n')
-            return
-        get_cves(part, vendor, product, version)
+        for var in cpe_db[cpe_id]:
+            f.write('---  CPE variat:' + var['part'] + ' ' + var['vendor'] + ' ' + var['product'] + ' ' + version + '\n')
+            get_cves(var['part'], var['vendor'], var['product'], version)
 
 f = open("cve_log.txt", "w")
 now = datetime.now()
 current_time = now.strftime("%H:%M:%S")
 f.write('------------------Started---------------:' + current_time + '\n')
+
+cpe_file = Cpe_file(CSV_HOME + CPE_TABLE)
+cpe_file.process()
 
 product_cpe_file = Product_cpe_file(CSV_HOME + PRODUCT_CPE_TABLE)
 product_cpe_file.process()
