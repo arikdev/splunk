@@ -91,6 +91,14 @@ def handle_cve(item, part, vendor, product, version, cves):
                     endIncluding = match['versionEndIncluding']
                     if version_cmp(version, endIncluding) == 1:
                         continue;
+                if 'versionStartExcluding' in match:
+                    startExcluding = match['versionStartExcluding']
+                    if version_cmp(version, startExcluding) != 1:
+                        continue;
+                if 'versionEndExcluding' in match:
+                    endExcluding = match['versionEndExcluding']
+                    if version_cmp(version, endExcluding) != 1:
+                        continue;
                 cves.append(cve_id)
                 found = True
                 break
