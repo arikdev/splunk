@@ -26,7 +26,6 @@ service = client.connect(
   password=PASSWORD)
 
 index = 'cve3'
-
 debug = False
 
 def version_cmp(ver1, ver2):
@@ -190,6 +189,14 @@ class Cpe_file(csv.CSV_FILE):
         cpe_info['product'] = tokens[3]
         cpe_entry.append(cpe_info)
 
+class Incident_seq_file(csv.CSV_FILE):
+    def implementation(self, tokens):
+        global incident_seq
+        if int(tokens[0]) > incident_seq:
+            incident_seq = int(tokens[0])
+
+incident_seq = 0
+
 product_db = {}
 cpe_db = {}
 def init_db():
@@ -201,6 +208,9 @@ def init_db():
 
     cpe_file = Cpe_file(CSV_HOME + CPE_TABLE)
     cpe_file.process()
+
+    incident_seq_file = Incident_seq_file(CSV_HOME + INCIDENT_TABLE)
+    incident_seq_file.process()
 
 def dump_db():
     print(product_db)
@@ -238,8 +248,10 @@ def get_incident(incidents_db, product_id, cve, cpe, version):
     return None
 
 def insert_incident(incidents_file, incidents, product_id, cve, cpe, version, cvss):
+    global incident_seq
     incident_values = []
-    incident_values.append('99')
+    incident_seq += 1
+    incident_values.append(str(incident_seq))
     incident_values.append(cve)
     incident_values.append(cpe)
     incident_values.append(version)
