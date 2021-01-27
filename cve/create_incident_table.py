@@ -85,12 +85,10 @@ def handle_cve(item, part, vendor, product, version, cves):
                 endIncluding = None
                 if 'versionStartIncluding' in match:
                     startIncluding = match['versionStartIncluding']
-                    #print('startIncluding:' + startIncluding)
                     if version_cmp(version, startIncluding) == -1:
                         continue;
                 if 'versionEndIncluding' in match:
                     endIncluding = match['versionEndIncluding']
-                    #print('endIncluding:' + endIncluding + ' ' + cve_id)
                     if version_cmp(version, endIncluding) == 1:
                         continue;
                 cves.append(cve_id)
