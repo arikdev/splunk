@@ -43,12 +43,8 @@ def handle_patch(cve_id, url, str_patch):
     global files_found
     if url is not None:
         handle_commit(cve_id, url)
-    words = re.split('\s+', str_patch)
-    for word in words:
-        if '.c' in word or '.h' in word:
-            files = re.findall(r'(/[a-zA-Z0-9\/]*\w+\.[ch])[^a-z]', word)
-            handle_files(cve_id, files)
-
+        files = re.findall(r'(\/[\/\w]*?\.[ch]+\b)', str_patch)
+        handle_files(cve_id, files)
 
 def handle_ref(cve_id, r):
     global counter
