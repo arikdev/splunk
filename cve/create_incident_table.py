@@ -141,12 +141,12 @@ class Product_cpe_file(csv.CSV_FILE):
         if product_id not in product_db:
            print('ERROR: product :' + product_id)
            return
-        product_db[product_id] = {}
         product_entry = product_db[product_id]
-        product_entry[cpe_id] = {}
-        cpe_entry = product_entry[cpe_id];
-        cpe_entry['version'] = version
-        cpe_entry['cves'] = []
+        if cpe_id not in product_entry:
+            product_entry[cpe_id] = {}
+            cpe_entry = product_entry[cpe_id];
+            cpe_entry['version'] = version
+            cpe_entry['cves'] = []
 
 class Cpe_file(csv.CSV_FILE):
     def implementation(self, tokens):
@@ -223,7 +223,7 @@ for product_id,product_info in product_db.items():
         for variant in cpe_variants:
             get_cves(cves, variant['part'], variant['vendor'], variant['product'], version)
 
-#dump_db()
+dump_db()
 
 incident_file = csv.CSV_FILE(CSV_HOME + INCIDENT_TABLE)
 
@@ -234,7 +234,6 @@ product_id
 print('----------------------------------------------------')
 res = get_incident(incidents, '1', 'CVE-2022-9041', 'linux:kernel', '5.4')
 print(res)
-sys.exit()
 
 print('----------------------------------------------------')
 print(product_db)
