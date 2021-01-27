@@ -27,6 +27,8 @@ service = client.connect(
 
 index = 'cve'
 
+debug = False
+
 def version_cmp(ver1, ver2):
     parts1 = [int(x) for x in ver1.split('.')]
     parts2 = [int(x) for x in ver2.split('.')]
@@ -174,8 +176,8 @@ def init_db():
     cpe_file.process()
 
 def dump_db():
-    #print(product_db)
-    #print(cpe_db)
+    print(product_db)
+    print(cpe_db)
     for product_id,product_info in product_db.items():
         print('-----------------------')
         print('product id:' + product_id)
@@ -208,8 +210,22 @@ def get_incident(incidents_db, product_id, cve, cpe, version):
 
     return None
 
-def insert_incident(incident_file, incidents, product_id, cve, cpe, version):
+def insert_incident(incidents_file, incidents, product_id, cve, cpe, version):
     incident_values = []
+    incident_values.append('99')
+    incident_values.append(cve)
+    incident_values.append(cpe)
+    incident_values.append(version)
+    incident_values.append(product_id)
+    incident_values.append('9')
+    incident_values.append('Open')
+    incident_values.append('nvd')
+    incident_values.append('time')
+    incident_values.append('Creation time')
+    incident_values.append('Jira ticket')
+    incident_values.append('0')
+    incident_values.append('20')
+
     incidents_file.insert_dic_line(incidents, incident_values)
 
     
@@ -223,21 +239,19 @@ for product_id,product_info in product_db.items():
         for variant in cpe_variants:
             get_cves(cves, variant['part'], variant['vendor'], variant['product'], version)
 
-dump_db()
+if debug:
+    dump_db()
 
 incident_file = csv.CSV_FILE(CSV_HOME + INCIDENT_TABLE)
 
 #Load the content of incident table to a dictionary
 #The matchin fileds in the incident table is product_id,cve,cpe,version
 incidents = incident_file.to_dic();
-product_id
-print('----------------------------------------------------')
-res = get_incident(incidents, '1', 'CVE-2022-9041', 'linux:kernel', '5.4')
-print(res)
 
-print('----------------------------------------------------')
-print(product_db)
-print('----------------------------------------------------')
+if debug:
+    print('=========================== indidents b4 !!!: ===================================================================')
+    print(incidents)
+
 for product_id,product_info in product_db.items():
     for cpe, cpe_info in product_info.items():
         if 'version' not in cpe_info:
@@ -247,10 +261,19 @@ for product_id,product_info in product_db.items():
             #nothing to do for this cpe.
             continue
         version = cpe_info['version']
+        if debug:
+            print('>>>>> Processing ' + str(product_id) + ' ' + str(cpe) + ' ' + str(version))
         cves = cpe_info['cves']
         for cve in cves:
-            print('key: ' + product_id + ',' +  cve + ',' + cpe + ',' + version)
+            if debug:
+                print('key: ' + product_id + ',' +  cve + ',' + cpe + ',' + version)
             res = get_incident(incidents, product_id, cve, cpe, version)
             if res is not None:
                 continue
-            #insert_incident(incident_file, incidents, product_id, cve, cpe, version)
+            insert_incident(incident_file, incidents, product_id, cve, cpe, version)
+
+if debug:
+    print('=========================== incidents after !!!: ===================================================================')
+    print(incidents)
+
+incident_file.from_dic(incidents)
