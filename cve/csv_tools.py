@@ -19,7 +19,7 @@ class CSV_FILE:
                 self.implementation(tokens)
 
     def to_dic(self):
-        csv = []
+        csv_lines = []
         global names
         names = []
         with open(self.file_name, 'r') as fp:
@@ -38,11 +38,22 @@ class CSV_FILE:
                 info = {}
                 for ind, item in enumerate(names):
                     info[item] = tokens[ind]
-                csv.append(info)
+                csv_lines.append(info)
     
-        return csv
+        return csv_lines
 
 
-    def insert_dic_line(self, csv, values):
+    def insert_dic_line(self, csv_lines, values):
         new_dic = dict(zip(names, values))
-        csv.append(new_dic)
+        csv_lines.append(new_dic)
+
+    def from_dic(self, csv_lines):
+        f = open(self.file_name, 'w') 
+        f.write(','.join(names) + '\n')
+        for line in csv_lines:
+            csv_line = ''
+            for key,value in line.items():
+                csv_line += value + ','
+            csv_line = csv_line[:-1]
+            f.write(csv_line + '\n')
+        f.close()
