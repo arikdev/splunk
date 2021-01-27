@@ -24,6 +24,7 @@ def get_cves(cpe_part, cpe_vendor, cpe_product, cpe_version):
         items = result['CVE_Items']
         items_read = len(items)
         total_items_read += items_read
+        f.write(f'    ----- get cves %s:%s:%s:%s items read:%d totaol items read: %d \n' % (cpe_part, cpe_vendor, cpe_product, cpe_version, items_read, total_items_read))
         for item in items:
             cve = item['cve']
             meta_data = cve['CVE_data_meta']
@@ -54,7 +55,7 @@ class Product_cpe_file(csv.CSV_FILE):
         product_id = tokens[0]
         cpe_id = tokens[1]
         version = tokens[2]
-        f.write("--- Procssgin: " + product_id + ' ' + cpe_id + ' ' + version + '\n')
+        f.write("--- Processing: " + product_id + ' ' + cpe_id + ' ' + version + '\n')
         for var in cpe_db[cpe_id]:
             f.write('---  CPE variat:' + var['part'] + ' ' + var['vendor'] + ' ' + var['product'] + ' ' + version + '\n')
             get_cves(var['part'], var['vendor'], var['product'], version)
