@@ -25,7 +25,7 @@ service = client.connect(
   username=USERNAME,
   password=PASSWORD)
 
-index = 'cve'
+index = 'cve3'
 
 debug = False
 
@@ -49,6 +49,20 @@ def version_cmp(ver1, ver2):
 
     return 0
 
+def get_cvss(cve_item):
+    cvss = '0'
+    impact = cve_item['impact']
+    if 'baseMetricV3' in impact:
+        if 'cvssV3' in impact['baseMetricV3']:
+            if 'baseScore' in impact['baseMetricV3']['cvssV3']:
+                return  impact['baseMetricV3']['cvssV3']['baseScore']
+    if 'baseMetricV2' in impact:
+        if 'cvssV2' in impact['baseMetricV2']:
+            if 'baseScore' in impact['baseMetricV2']['cvssV2']:
+                return  impact['baseMetricV2']['cvssV2']['baseScore']
+
+    return cvss
+
 def handle_cve(item, part, vendor, product, version, cves):
     cve_item = json.loads(item)
     cve = cve_item['cve']
@@ -56,6 +70,7 @@ def handle_cve(item, part, vendor, product, version, cves):
     cve_id = meta_data['ID']
     conf = cve_item['configurations']
     nodes = conf['nodes']
+    cvss = str(get_cvss(cve_item))
     found = False
     for node in nodes:
         if found:
@@ -75,7 +90,10 @@ def handle_cve(item, part, vendor, product, version, cves):
                 continue
             cur_version = tokens[5]
             if cur_version.find(version) != -1:
-                cves.append(cve_id)
+                cve_info = {}
+                cve_info['cve_id'] = cve_id
+                cve_info['cvss'] = cvss
+                cves.append(cve_info)
                 found = True
                 break
             if cur_version == '-':
@@ -99,7 +117,10 @@ def handle_cve(item, part, vendor, product, version, cves):
                     endExcluding = match['versionEndExcluding']
                     if version_cmp(version, endExcluding) != 1:
                         continue;
-                cves.append(cve_id)
+                cve_info = {}
+                cve_info['cve_id'] = cve_id
+                cve_info['cvss'] = cvss
+                cves.append(cve_info)
                 found = True
                 break
 
@@ -199,7 +220,7 @@ def dump_db():
                 print(variant['product'])
                 print(version)
                 for cve in cves:
-                    print(cve)
+                    print(cve['cve_id'])
 
 def get_incident(incidents_db, product_id, cve, cpe, version):
     for incident in incidents_db:
@@ -216,7 +237,7 @@ def get_incident(incidents_db, product_id, cve, cpe, version):
 
     return None
 
-def insert_incident(incidents_file, incidents, product_id, cve, cpe, version):
+def insert_incident(incidents_file, incidents, product_id, cve, cpe, version, cvss):
     incident_values = []
     incident_values.append('99')
     incident_values.append(cve)
@@ -230,7 +251,7 @@ def insert_incident(incidents_file, incidents, product_id, cve, cpe, version):
     incident_values.append('Creation time')
     incident_values.append('Jira ticket')
     incident_values.append('0')
-    incident_values.append('20')
+    incident_values.append(cvss)
 
     incidents_file.insert_dic_line(incidents, incident_values)
 
@@ -271,12 +292,13 @@ for product_id,product_info in product_db.items():
             print('>>>>> Processing ' + str(product_id) + ' ' + str(cpe) + ' ' + str(version))
         cves = cpe_info['cves']
         for cve in cves:
+            cve_id = cve['cve_id']
             if debug:
-                print('key: ' + product_id + ',' +  cve + ',' + cpe + ',' + version)
-            res = get_incident(incidents, product_id, cve, cpe, version)
+                print('key: ' + product_id + ',' +  cve_id + ',' + cpe + ',' + version)
+            res = get_incident(incidents, product_id, cve_id, cpe, version)
             if res is not None:
                 continue
-            insert_incident(incident_file, incidents, product_id, cve, cpe, version)
+            insert_incident(incident_file, incidents, product_id, cve_id, cpe, version, cve['cvss'])
 
 if debug:
     print('=========================== incidents after !!!: ===================================================================')
