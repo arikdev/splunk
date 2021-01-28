@@ -25,7 +25,7 @@ service = client.connect(
   username=USERNAME,
   password=PASSWORD)
 
-index = 'cve3'
+index = 'cve'
 debug = False
 
 def version_cmp(ver1, ver2):
@@ -158,6 +158,8 @@ class Product_file(csv.CSV_FILE):
     def implementation(self, tokens):
         global product_db
         product_db[tokens[0]] = {}
+        product_db[tokens[0]]['cpes'] = {}
+        product_db[tokens[0]]['customer'] = tokens[2]
 
 class Product_cpe_file(csv.CSV_FILE):
     def implementation(self, tokens):
@@ -169,10 +171,10 @@ class Product_cpe_file(csv.CSV_FILE):
         if product_id not in product_db:
            print('ERROR: product :' + product_id)
            return
-        product_entry = product_db[product_id]
-        if cpe_id not in product_entry:
-            product_entry[cpe_id] = {}
-            cpe_entry = product_entry[cpe_id];
+        product_cpes = product_db[product_id]['cpes']
+        if cpe_id not in product_cpes:
+            product_cpes[cpe_id] = {}
+            cpe_entry = product_cpes[cpe_id];
             cpe_entry['version'] = version
             cpe_entry['cves'] = []
 
@@ -218,7 +220,7 @@ def dump_db():
     for product_id,product_info in product_db.items():
         print('-----------------------')
         print('product id:' + product_id)
-        for cpe_id, cpe_info in product_info.items():
+        for cpe_id, cpe_info in product_info['cpes'].items():
             print(cpe_id)
             version = cpe_info['version']
             cves = cpe_info['cves']
@@ -247,7 +249,7 @@ def get_incident(incidents_db, product_id, cve, cpe, version):
 
     return None
 
-def insert_incident(incidents_file, incidents, product_id, cve, cpe, version, cvss):
+def insert_incident(incidents_file, incidents, product_id, customer_id, cve, cpe, version, cvss):
     global incident_seq
     incident_values = []
     incident_seq += 1
@@ -256,7 +258,7 @@ def insert_incident(incidents_file, incidents, product_id, cve, cpe, version, cv
     incident_values.append(cpe)
     incident_values.append(version)
     incident_values.append(product_id)
-    incident_values.append('9')
+    incident_values.append(customer_id)
     incident_values.append('Open')
     incident_values.append('nvd')
     now = datetime.now()
@@ -272,7 +274,7 @@ def insert_incident(incidents_file, incidents, product_id, cve, cpe, version, cv
 init_db()
 
 for product_id,product_info in product_db.items():
-    for cpe_id, cpe_info in product_info.items():
+    for cpe_id, cpe_info in product_info['cpes'].items():
         version = cpe_info['version']
         cves = cpe_info['cves']
         cpe_variants = get_cpe_variants(cpe_id)
@@ -293,7 +295,8 @@ if debug:
     print(incidents)
 
 for product_id,product_info in product_db.items():
-    for cpe, cpe_info in product_info.items():
+    customer_id = product_info['customer']
+    for cpe, cpe_info in product_info['cpes'].items():
         if 'version' not in cpe_info:
             print('ERROR: no version in cpe: ' + cpe)
             continue
@@ -311,7 +314,7 @@ for product_id,product_info in product_db.items():
             res = get_incident(incidents, product_id, cve_id, cpe, version)
             if res is not None:
                 continue
-            insert_incident(incident_file, incidents, product_id, cve_id, cpe, version, cve['cvss'])
+            insert_incident(incident_file, incidents, product_id, customer_id, cve_id, cpe, version, cve['cvss'])
 
 if debug:
     print('=========================== incidents after !!!: ===================================================================')
