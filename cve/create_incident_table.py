@@ -13,6 +13,7 @@ CPE_TABLE = 'vul_cpe.csv'
 PRODUCT_TABLE = 'vul_product_table.csv'
 PRODUCT_CPE_TABLE = 'vul_product_cpe.csv'
 INCIDENT_TABLE = 'vul_incidents.csv'
+CPE_COMPILED_FILES_TABLE = 'vul_cpe_compiled_files.csv'
 
 HOST = "localhost"
 PORT = 8089
@@ -25,7 +26,8 @@ service = client.connect(
   username=USERNAME,
   password=PASSWORD)
 
-index = 'cve'
+index = 'cve3'
+ref_index = 'cve_ref3'
 debug = False
 
 def version_cmp(ver1, ver2):
@@ -100,22 +102,25 @@ def handle_cve(item, part, vendor, product, version, cves):
             if cur_version == '*':
                 startIncluding = None
                 endIncluding = None
-                if 'versionStartIncluding' in match:
-                    startIncluding = match['versionStartIncluding']
-                    if version_cmp(version, startIncluding) == -1:
-                        continue;
-                if 'versionEndIncluding' in match:
-                    endIncluding = match['versionEndIncluding']
-                    if version_cmp(version, endIncluding) == 1:
-                        continue;
-                if 'versionStartExcluding' in match:
-                    startExcluding = match['versionStartExcluding']
-                    if version_cmp(version, startExcluding) != 1:
-                        continue;
-                if 'versionEndExcluding' in match:
-                    endExcluding = match['versionEndExcluding']
-                    if version_cmp(version, endExcluding) != 1:
-                        continue;
+                try:
+                    if 'versionStartIncluding' in match:
+                        startIncluding = match['versionStartIncluding']
+                        if version_cmp(version, startIncluding) == -1:
+                            continue;
+                    if 'versionEndIncluding' in match:
+                        endIncluding = match['versionEndIncluding']
+                        if version_cmp(version, endIncluding) == 1:
+                            continue;
+                    if 'versionStartExcluding' in match:
+                        startExcluding = match['versionStartExcluding']
+                        if version_cmp(version, startExcluding) != 1:
+                            continue;
+                    if 'versionEndExcluding' in match:
+                        endExcluding = match['versionEndExcluding']
+                        if version_cmp(version, endExcluding) != 1:
+                            continue;
+                except ValueError:
+                    print('ERROR in versionStartIncluding')
                 cve_info = {}
                 cve_info['cve_id'] = cve_id
                 cve_info['cvss'] = cvss
@@ -128,7 +133,7 @@ def handle_cve(item, part, vendor, product, version, cves):
 # Get CVES that match CPE from the splunk
 def get_cves(cves, part, vendor, product, version):
     search = f'search index="' + index + '" | search configurations.nodes{}.cpe_match{}.cpe23Uri="cpe:2.3:%s:%s:%s:*"' % (part, vendor, product)
-    job = service.jobs.create(search)
+    job = service.jobs.create(search, max_count=4096)
     while True:
         while not job.is_ready():
             pass
@@ -136,7 +141,8 @@ def get_cves(cves, part, vendor, product, version):
             break
         sleep(0.05)
     
-    reader = results.ResultsReader(job.results())
+    kwargs_options = {"count" : 4096}
+    reader = results.ResultsReader(job.results(**kwargs_options))
     
     for item in reader:
         if '_raw' in item:
@@ -191,16 +197,61 @@ class Cpe_file(csv.CSV_FILE):
         cpe_info['product'] = tokens[3]
         cpe_entry.append(cpe_info)
 
+class Cpe_compiled_files(csv.CSV_FILE):
+    def implementation(self, tokens):
+        global cpe_compiled_files_db
+        cpe_id = tokens[0]
+        version = tokens[1]
+        product_id = tokens[2]
+        source_file = tokens[3]
+        if cpe_id not in cpe_compiled_files_db:
+           cpe_compiled_files_db[cpe_id] = []
+        found = False
+        for cpe_entry in cpe_compiled_files_db[cpe_id]:
+            if 'version' in cpe_entry and cpe_entry['version'] == version and 'product_id' in cpe_entry and cpe_entry['product_id'] == product_id: 
+                found = True
+                break;
+        if not found:
+            new_entry = {}
+            new_entry['files'] = []
+            new_entry['version'] = version
+            new_entry['product_id'] = product_id
+            cpe_compiled_files_db[cpe_id].append(new_entry)
+            cpe_entry = new_entry
+
+        if source_file not in cpe_entry['files']:
+            cpe_entry['files'].append(source_file)
+
+
 class Incident_seq_file(csv.CSV_FILE):
     def implementation(self, tokens):
         global incident_seq
         if int(tokens[0]) > incident_seq:
             incident_seq = int(tokens[0])
 
+def get_reference(cve_id):
+    search = f'search index="' + ref_index + '" | search cve_id="%s"' % cve_id
+    job = service.jobs.create(search)
+    while True:
+        while not job.is_ready():
+            pass
+        if job['isDone'] == '1':
+            break
+        sleep(0.05)
+
+    reader = results.ResultsReader(job.results())
+
+    for item in reader:
+        if '_raw' in item:
+            return json.loads(item['_raw'])
+
+    return None
+
 incident_seq = 0
 
 product_db = {}
 cpe_db = {}
+cpe_compiled_files_db = {}
 def init_db():
     product_file = Product_file(CSV_HOME + PRODUCT_TABLE)
     product_file.process()
@@ -213,6 +264,10 @@ def init_db():
 
     incident_seq_file = Incident_seq_file(CSV_HOME + INCIDENT_TABLE)
     incident_seq_file.process()
+
+    cpe_compiled_files = Cpe_compiled_files(CSV_HOME + CPE_COMPILED_FILES_TABLE)
+    cpe_compiled_files.process()
+
 
 def dump_db():
     print(product_db)
@@ -270,6 +325,29 @@ def insert_incident(incidents_file, incidents, product_id, customer_id, cve, cpe
 
     incidents_file.insert_dic_line(incidents, incident_values)
 
+
+def is_reference_relevant(cve_id, cpe, version, product_id):
+    reference = get_reference(cve_id)
+    # No reference for the CVE - nothing to do
+    if reference == None:
+        return False
+    if cpe not in cpe_compiled_files_db:
+        return False
+    found = False
+    for cpe_entry in cpe_compiled_files_db[cpe]:
+        if 'version' in cpe_entry and cpe_entry['version'] == version and 'product_id' in cpe_entry and cpe_entry['product_id'] == product_id: 
+            found = True
+            break
+    if not found:
+        return False
+
+    for pfile in cpe_entry['files']:
+        for rfile in reference['files']:
+            if pfile in rfile:
+                return True
+
+    return False
+
     
 init_db()
 
@@ -309,8 +387,12 @@ for product_id,product_info in product_db.items():
         cves = cpe_info['cves']
         for cve in cves:
             cve_id = cve['cve_id']
+            # No reference for the CVE - nothing to do
+            if is_reference_relevant(cve_id, cpe, version, product_id) == False:
+                continue
             if debug:
                 print('key: ' + product_id + ',' +  cve_id + ',' + cpe + ',' + version)
+                print(reference)
             res = get_incident(incidents, product_id, cve_id, cpe, version)
             if res is not None:
                 continue
