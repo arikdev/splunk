@@ -202,20 +202,18 @@ class Cpe_compiled_files(csv.CSV_FILE):
     def implementation(self, tokens):
         global cpe_compiled_files_db
         cpe_id = tokens[0]
-        version = tokens[1]
-        product_id = tokens[2]
-        source_file = tokens[3]
+        product_id = tokens[1]
+        source_file = tokens[2]
         if cpe_id not in cpe_compiled_files_db:
            cpe_compiled_files_db[cpe_id] = []
         found = False
         for cpe_entry in cpe_compiled_files_db[cpe_id]:
-            if 'version' in cpe_entry and cpe_entry['version'] == version and 'product_id' in cpe_entry and cpe_entry['product_id'] == product_id: 
+            if 'product_id' in cpe_entry and cpe_entry['product_id'] == product_id: 
                 found = True
                 break;
         if not found:
             new_entry = {}
             new_entry['files'] = []
-            new_entry['version'] = version
             new_entry['product_id'] = product_id
             cpe_compiled_files_db[cpe_id].append(new_entry)
             cpe_entry = new_entry
@@ -336,7 +334,7 @@ def is_reference_relevant(cve_id, cpe, version, product_id):
         return False
     found = False
     for cpe_entry in cpe_compiled_files_db[cpe]:
-        if 'version' in cpe_entry and cpe_entry['version'] == version and 'product_id' in cpe_entry and cpe_entry['product_id'] == product_id: 
+        if 'product_id' in cpe_entry and cpe_entry['product_id'] == product_id: 
             found = True
             break
     if not found:
