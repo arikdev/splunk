@@ -4,6 +4,9 @@ class CSV_FILE:
     def __init__(self, file_name):
         self.file_name = file_name
 
+    def __repr__(self):
+        return 'csv file:' + self.file_name
+
     def implementation(self, tokens):
         print("No implemantation !!!!!")
 
