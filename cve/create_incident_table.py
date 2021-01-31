@@ -163,9 +163,10 @@ def get_cpe_variants(cpe):
 class Product_file(csv.CSV_FILE):
     def implementation(self, tokens):
         global product_db
-        product_db[tokens[0]] = {}
-        product_db[tokens[0]]['cpes'] = {}
-        product_db[tokens[0]]['customer'] = tokens[2]
+        product_id = tokens[0]
+        product_db[product_id] = {}
+        product_db[product_id]['cpes'] = {}
+        product_db[product_id]['customer'] = tokens[2]
 
 class Product_cpe_file(csv.CSV_FILE):
     def implementation(self, tokens):
