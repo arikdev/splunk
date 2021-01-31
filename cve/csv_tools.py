@@ -1,14 +1,16 @@
-names = []
-
 class CSV_FILE:
+    names = []
     def __init__(self, file_name):
         self.file_name = file_name
 
     def __repr__(self):
         return 'csv file:' + self.file_name
 
+    def __len__(self):
+        return 0
+
     def implementation(self, tokens):
-        print("No implemantation !!!!!")
+        pass
 
     def process(self):
         with open(self.file_name, 'r') as fp:
