@@ -3,12 +3,14 @@ import json
 import sys
 from datetime import datetime
 from time import sleep
-import splunklib.client as client
 import splunklib.results as results
 from splunklib.searchcommands import dispatch, StreamingCommand, Configuration, Option, validators
 import csv_tools as csv
 from general_tools import timer
 import concurrent.futures
+from time import time
+from splunk_tools import search_splunk
+from splunk_tools import connect_splunk
 
 CSV_HOME = '/home/manage/splunk/etc/apps/lookup_editor/lookups/'
 CPE_TABLE = 'vul_cpe.csv'
@@ -22,7 +24,7 @@ PORT = 8089
 USERNAME = "admin"
 PASSWORD = "faurecia#security"
 
-service = client.connect(
+service = connect_splunk(
   host=HOST,
   port=PORT,
   username=USERNAME,
@@ -136,20 +138,7 @@ def handle_cve(item, part, vendor, product, version, cves):
 # Get CVES that match CPE from the splunk
 def get_cves(cves, part, vendor, product, version):
     search = f'search index="' + index + '" | search configurations.nodes{}.cpe_match{}.cpe23Uri="cpe:2.3:%s:%s:%s:*"' % (part, vendor, product)
-    job = service.jobs.create(search, max_count=4096)
-    while True:
-        while not job.is_ready():
-            pass
-        if job['isDone'] == '1':
-            break
-        sleep(0.05)
-    
-    kwargs_options = {"count" : 4096}
-    reader = results.ResultsReader(job.results(**kwargs_options))
-    
-    for item in reader:
-        if '_raw' in item:
-            handle_cve(item['_raw'], part, vendor, product, version, cves)
+    search_splunk(service, search, 4096, handle_cve, part, vendor, product, version, cves)
 
 def get_cpe_variants(cpe):
     if cpe not in cpe_db:
@@ -242,12 +231,12 @@ def get_reference(cve_id):
         sleep(0.05)
 
     reader = results.ResultsReader(job.results())
-
     for item in reader:
         if '_raw' in item:
             return json.loads(item['_raw'])
 
     return None
+
 
 def init_db():
     product_file = Product_file(CSV_HOME + PRODUCT_TABLE)
@@ -266,7 +255,7 @@ def init_db():
     cpe_compiled_files.process()
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
-        executor.map(handle_product_init_db, product_db.items())
+        exec_results = executor.map(handle_product_init_db, product_db.items())
 
 
 def dump_db():
@@ -308,6 +297,8 @@ def __handle_product_init_db(product_entry):
         for variant in cpe_variants:
             get_cves(cves, variant['part'], variant['vendor'], variant['product'], version)
 
+    return ""
+
 
 if get_time:
     @timer
@@ -345,6 +336,8 @@ def __handle_product(product_entry):
             if res is not None:
                 continue
             insert_incident(incident_file, incidents, product_id, customer_id, cve_id, cpe, version, cve['cvss'])
+
+    return ""
 
 
 def get_incident(incidents_db, product_id, cve, cpe, version):
@@ -424,6 +417,7 @@ product_db = {}
 cpe_db = {}
 cpe_compiled_files_db = {}
 
+
 init_db()
 
 if debug:
@@ -437,7 +431,7 @@ if debug:
     print(incidents)
 
 with concurrent.futures.ThreadPoolExecutor() as executor:
-    executor.map(handle_product, product_db.items())
+    exec_results = executor.map(handle_product, product_db.items())
 
 if debug:
     print('=========================== incidents after !!!: ===================================================================')

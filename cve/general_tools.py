@@ -8,3 +8,4 @@ def timer(func):
         print('Elapsed time:' + str(time_after - time_before))
         return ret
     return wrapper
+
