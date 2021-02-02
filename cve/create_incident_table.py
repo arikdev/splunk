@@ -348,6 +348,16 @@ def is_reference_relevant(cve_id, cpe, version, product_id):
     return False
 
     
+# DB model: product db
+# {'product_id' : 'customer_id' : '..'
+#                 'cpes': { 'cpe1name' :{ 'version': '...'
+#                                         'cves'    : ['CVE-2020-28282', ...]
+#                                       }
+#                           'cpe2name' :{ 'version': '...'
+#                                         'cves'    : ['CVE-2020-28282', ...]
+#                                       }
+#                         }
+#  }
 init_db()
 
 for product_id,product_info in product_db.items():
@@ -368,7 +378,6 @@ incident_file = csv.CSV_FILE(CSV_HOME + INCIDENT_TABLE)
 incidents = incident_file.to_dic();
 
 if debug:
-    print('=========================== indidents b4 !!!: ===================================================================')
     print(incidents)
 
 for product_id,product_info in product_db.items():
