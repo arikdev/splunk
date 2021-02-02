@@ -7,6 +7,7 @@ import splunklib.client as client
 import splunklib.results as results
 from splunklib.searchcommands import dispatch, StreamingCommand, Configuration, Option, validators
 import csv_tools as csv
+from general_tools import timer
 
 CSV_HOME = '/home/manage/splunk/etc/apps/lookup_editor/lookups/'
 CPE_TABLE = 'vul_cpe.csv'
@@ -26,9 +27,10 @@ service = client.connect(
   username=USERNAME,
   password=PASSWORD)
 
-index = 'cve3'
-ref_index = 'cve_ref3'
+index = 'cve5'
+ref_index = 'cve_ref5'
 debug = False
+get_time = True
 
 def version_cmp(ver1, ver2):
     parts1 = [int(x) for x in ver1.split('.')]
@@ -246,11 +248,6 @@ def get_reference(cve_id):
 
     return None
 
-incident_seq = 0
-
-product_db = {}
-cpe_db = {}
-cpe_compiled_files_db = {}
 def init_db():
     product_file = Product_file(CSV_HOME + PRODUCT_TABLE)
     product_file.process()
@@ -266,6 +263,9 @@ def init_db():
 
     cpe_compiled_files = Cpe_compiled_files(CSV_HOME + CPE_COMPILED_FILES_TABLE)
     cpe_compiled_files.process()
+
+    for product_id,product_info in product_db.items():
+        handle_product_init_db(product_id, product_info)
 
 
 def dump_db():
@@ -287,6 +287,60 @@ def dump_db():
                 print(version)
                 for cve in cves:
                     print(cve['cve_id'])
+
+if get_time:
+    @timer
+    def handle_product_init_db(product_id, product_info):
+        return __handle_product_init_db(product_id, product_info)
+else:
+    def handle_product_init_db(product_id, product_info):
+        return __handle_product_init_db(product_id, product_info)
+
+def __handle_product_init_db(product_id, product_info):
+    print('Handleing product init DB ..... product:' + product_id)
+    for cpe_id, cpe_info in product_info['cpes'].items():
+        version = cpe_info['version']
+        cves = cpe_info['cves']
+        cpe_variants = get_cpe_variants(cpe_id)
+        for variant in cpe_variants:
+            get_cves(cves, variant['part'], variant['vendor'], variant['product'], version)
+
+
+if get_time:
+    @timer
+    def handle_product(product_id, product_info):
+        return __handle_product(product_id, product_info)
+else:
+    def handle_product(product_id, product_info):
+        return __handle_product(product_id, product_info)
+
+def __handle_product(product_id, product_info):
+    print('Handling product: ' + product_id)
+    customer_id = product_info['customer']
+    for cpe, cpe_info in product_info['cpes'].items():
+        if 'version' not in cpe_info:
+            print('ERROR: no version in cpe: ' + cpe)
+            continue
+        if 'cves' not in cpe_info:
+            #nothing to do for this cpe.
+            continue
+        version = cpe_info['version']
+        if debug:
+            print('>>>>> Processing ' + str(product_id) + ' ' + str(cpe) + ' ' + str(version))
+        cves = cpe_info['cves']
+        for cve in cves:
+            cve_id = cve['cve_id']
+            # No reference for the CVE - nothing to do
+            if is_reference_relevant(cve_id, cpe, version, product_id) == False:
+                continue
+            if debug:
+                print('key: ' + product_id + ',' +  cve_id + ',' + cpe + ',' + version)
+                print(reference)
+            res = get_incident(incidents, product_id, cve_id, cpe, version)
+            if res is not None:
+                continue
+            insert_incident(incident_file, incidents, product_id, customer_id, cve_id, cpe, version, cve['cvss'])
+
 
 def get_incident(incidents_db, product_id, cve, cpe, version):
     for incident in incidents_db:
@@ -347,7 +401,6 @@ def is_reference_relevant(cve_id, cpe, version, product_id):
 
     return False
 
-    
 # DB model: product db
 # {'product_id' : 'customer_id' : '..'
 #                 'cpes': { 'cpe1name' :{ 'version': '...'
@@ -358,20 +411,17 @@ def is_reference_relevant(cve_id, cpe, version, product_id):
 #                                       }
 #                         }
 #  }
-init_db()
 
-for product_id,product_info in product_db.items():
-    for cpe_id, cpe_info in product_info['cpes'].items():
-        version = cpe_info['version']
-        cves = cpe_info['cves']
-        cpe_variants = get_cpe_variants(cpe_id)
-        for variant in cpe_variants:
-            get_cves(cves, variant['part'], variant['vendor'], variant['product'], version)
+incident_file = csv.CSV_FILE(CSV_HOME + INCIDENT_TABLE)
+incident_seq = 0
+product_db = {}
+cpe_db = {}
+cpe_compiled_files_db = {}
+
+init_db()
 
 if debug:
     dump_db()
-
-incident_file = csv.CSV_FILE(CSV_HOME + INCIDENT_TABLE)
 
 #Load the content of incident table to a dictionary
 #The matchin fileds in the incident table is product_id,cve,cpe,version
@@ -381,30 +431,7 @@ if debug:
     print(incidents)
 
 for product_id,product_info in product_db.items():
-    customer_id = product_info['customer']
-    for cpe, cpe_info in product_info['cpes'].items():
-        if 'version' not in cpe_info:
-            print('ERROR: no version in cpe: ' + cpe)
-            continue
-        if 'cves' not in cpe_info:
-            #nothing to do for this cpe.
-            continue
-        version = cpe_info['version']
-        if debug:
-            print('>>>>> Processing ' + str(product_id) + ' ' + str(cpe) + ' ' + str(version))
-        cves = cpe_info['cves']
-        for cve in cves:
-            cve_id = cve['cve_id']
-            # No reference for the CVE - nothing to do
-            if is_reference_relevant(cve_id, cpe, version, product_id) == False:
-                continue
-            if debug:
-                print('key: ' + product_id + ',' +  cve_id + ',' + cpe + ',' + version)
-                print(reference)
-            res = get_incident(incidents, product_id, cve_id, cpe, version)
-            if res is not None:
-                continue
-            insert_incident(incident_file, incidents, product_id, customer_id, cve_id, cpe, version, cve['cvss'])
+    handle_product(product_id, product_info)
 
 if debug:
     print('=========================== incidents after !!!: ===================================================================')
