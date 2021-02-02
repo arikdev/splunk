@@ -8,7 +8,7 @@ import splunklib.results as results
 from splunklib.searchcommands import dispatch, StreamingCommand, Configuration, Option, validators
 import csv_tools as csv
 from general_tools import timer
-import threading
+import concurrent.futures
 
 CSV_HOME = '/home/manage/splunk/etc/apps/lookup_editor/lookups/'
 CPE_TABLE = 'vul_cpe.csv'
@@ -265,13 +265,8 @@ def init_db():
     cpe_compiled_files = Cpe_compiled_files(CSV_HOME + CPE_COMPILED_FILES_TABLE)
     cpe_compiled_files.process()
 
-    product_db_init_threads = []
-    for product_id,product_info in product_db.items():
-        product_db_init_threads.append(threading.Thread(target=handle_product_init_db, args=(product_id, product_info)))
-    for t in product_db_init_threads:
-        t.start()
-    for t in product_db_init_threads:
-        t.join()
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        executor.map(handle_product_init_db, product_db.items())
 
 
 def dump_db():
@@ -296,13 +291,15 @@ def dump_db():
 
 if get_time:
     @timer
-    def handle_product_init_db(product_id, product_info):
-        return __handle_product_init_db(product_id, product_info)
+    def handle_product_init_db(product_entry):
+        return __handle_product_init_db(product_entry)
 else:
-    def handle_product_init_db(product_id, product_info):
-        return __handle_product_init_db(product_id, product_info)
+    def handle_product_init_db(product_entry):
+        return __handle_product_init_db(product_entry)
 
-def __handle_product_init_db(product_id, product_info):
+def __handle_product_init_db(product_entry):
+    product_id = product_entry[0]
+    product_info = product_entry[1]
     print('Handleing product init DB ..... product:' + product_id)
     for cpe_id, cpe_info in product_info['cpes'].items():
         version = cpe_info['version']
@@ -314,14 +311,16 @@ def __handle_product_init_db(product_id, product_info):
 
 if get_time:
     @timer
-    def handle_product(product_id, product_info):
-        return __handle_product(product_id, product_info)
+    def handle_product(product_entry):
+        return __handle_product(product_entry)
 else:
-    def handle_product(product_id, product_info):
-        return __handle_product(product_id, product_info)
+    def handle_product(product_entry):
+        return __handle_product(product_entry)
 
-def __handle_product(product_id, product_info):
-    print('Handling product: ' + product_id)
+def __handle_product(product_entry):
+    product_id = product_entry[0]
+    product_info = product_entry[1]
+    print('>>>>Handling product: ' + product_id)
     customer_id = product_info['customer']
     for cpe, cpe_info in product_info['cpes'].items():
         if 'version' not in cpe_info:
@@ -437,15 +436,8 @@ incidents = incident_file.to_dic();
 if debug:
     print(incidents)
 
-product_threads = []
-for product_id,product_info in product_db.items():
-    product_threads.append(threading.Thread(target=handle_product, args=(product_id, product_info)))
-for t in product_threads:
-    print('lll thread started')
-    t.start()
-for t in product_threads:
-    t.join()
-    print('thread joined')
+with concurrent.futures.ThreadPoolExecutor() as executor:
+    executor.map(handle_product, product_db.items())
 
 if debug:
     print('=========================== incidents after !!!: ===================================================================')
