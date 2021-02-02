@@ -8,6 +8,7 @@ import splunklib.results as results
 from splunklib.searchcommands import dispatch, StreamingCommand, Configuration, Option, validators
 import csv_tools as csv
 from general_tools import timer
+import threading
 
 CSV_HOME = '/home/manage/splunk/etc/apps/lookup_editor/lookups/'
 CPE_TABLE = 'vul_cpe.csv'
@@ -264,8 +265,13 @@ def init_db():
     cpe_compiled_files = Cpe_compiled_files(CSV_HOME + CPE_COMPILED_FILES_TABLE)
     cpe_compiled_files.process()
 
+    product_db_init_threads = []
     for product_id,product_info in product_db.items():
-        handle_product_init_db(product_id, product_info)
+        product_db_init_threads.append(threading.Thread(target=handle_product_init_db, args=(product_id, product_info)))
+    for t in product_db_init_threads:
+        t.start()
+    for t in product_db_init_threads:
+        t.join()
 
 
 def dump_db():
@@ -401,6 +407,7 @@ def is_reference_relevant(cve_id, cpe, version, product_id):
 
     return False
 
+#############################################################################
 # DB model: product db
 # {'product_id' : 'customer_id' : '..'
 #                 'cpes': { 'cpe1name' :{ 'version': '...'
@@ -430,8 +437,15 @@ incidents = incident_file.to_dic();
 if debug:
     print(incidents)
 
+product_threads = []
 for product_id,product_info in product_db.items():
-    handle_product(product_id, product_info)
+    product_threads.append(threading.Thread(target=handle_product, args=(product_id, product_info)))
+for t in product_threads:
+    print('lll thread started')
+    t.start()
+for t in product_threads:
+    t.join()
+    print('thread joined')
 
 if debug:
     print('=========================== incidents after !!!: ===================================================================')
