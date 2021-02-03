@@ -220,22 +220,33 @@ class Incident_seq_file(csv.CSV_FILE):
         if int(tokens[0]) > incident_seq:
             incident_seq = int(tokens[0])
 
-def get_reference(cve_id):
-    search = f'search index="' + ref_index + '" | search cve_id="%s"' % cve_id
-    job = service.jobs.create(search)
-    while True:
-        while not job.is_ready():
-            pass
-        if job['isDone'] == '1':
-            break
-        sleep(0.05)
 
-    reader = results.ResultsReader(job.results())
-    for item in reader:
-        if '_raw' in item:
-            return json.loads(item['_raw'])
+def handle_ref(item):
+    global ref_db
+    
+    j = json.loads(item)
+    if 'cve_id' not in j:
+        return
+    cve_id = j['cve_id']
+    if cve_id not in ref_db:
+        ref_db[cve_id] = {}
+        ref_db[cve_id]['files'] = []
+        ref_db[cve_id]['commits'] = []
+    files = ref_db[cve_id]['files']
+    ref_files = j['files']
+    for ref_file in ref_files:
+        if ref_file not in files:
+            files.append(ref_file)
+    commits = ref_db[cve_id]['commits']
+    ref_commits = j['commits']
+    for ref_commit in ref_commits:
+        if ref_commit not in commits:
+            commits.append(ref_commit)
 
-    return None
+
+def load_ref():
+    search = f'search index="' + ref_index + '"'
+    search_splunk(service, search, 4096, handle_ref)
 
 
 def init_db():
@@ -253,6 +264,8 @@ def init_db():
 
     cpe_compiled_files = Cpe_compiled_files(CSV_HOME + CPE_COMPILED_FILES_TABLE)
     cpe_compiled_files.process()
+
+    load_ref()
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
         exec_results = executor.map(handle_product_init_db, product_db.items())
@@ -378,10 +391,12 @@ def insert_incident(incidents_file, incidents, product_id, customer_id, cve, cpe
 
 
 def is_reference_relevant(cve_id, cpe, version, product_id):
-    reference = get_reference(cve_id)
-    # No reference for the CVE - nothing to do
-    if reference == None:
+    global cpe_compiled_files_db
+    global ref_db
+
+    if cve_id not in ref_db:
         return False
+
     if cpe not in cpe_compiled_files_db:
         return False
     found = False
@@ -393,7 +408,7 @@ def is_reference_relevant(cve_id, cpe, version, product_id):
         return False
 
     for pfile in cpe_entry['files']:
-        for rfile in reference['files']:
+        for rfile in ref_db[cve_id]['files']:
             if pfile in rfile:
                 return True
 
@@ -415,8 +430,8 @@ incident_file = csv.CSV_FILE(CSV_HOME + INCIDENT_TABLE)
 incident_seq = 0
 product_db = {}
 cpe_db = {}
+ref_db = {}
 cpe_compiled_files_db = {}
-
 
 init_db()
 
