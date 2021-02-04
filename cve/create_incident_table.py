@@ -30,10 +30,10 @@ service = connect_splunk(
   username=USERNAME,
   password=PASSWORD)
 
-index = 'cve5'
-ref_index = 'cve_ref5'
+index = 'cve6'
+ref_index = 'cve_ref6'
 debug = False
-get_time = True
+get_time = False
 
 def version_cmp(ver1, ver2):
     parts1 = [int(x) for x in ver1.split('.')]
@@ -122,7 +122,7 @@ def handle_cve(item, part, vendor, product, version, cves):
                             continue;
                     if 'versionEndExcluding' in match:
                         endExcluding = match['versionEndExcluding']
-                        if version_cmp(version, endExcluding) != 1:
+                        if version_cmp(version, endExcluding) != -1:
                             continue;
                 except ValueError:
                     print('ERROR in versionStartIncluding')
