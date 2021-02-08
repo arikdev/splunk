@@ -33,6 +33,8 @@ def handle_files(cve_id, files):
             files_found += 1
 
 def handle_commit(cve_id, url):
+    if 'commit' not in url:
+        return
     tokens = url.split('/')
     commit_id = tokens[-1]
     tokens = commit_id.split('=')
@@ -64,9 +66,7 @@ def handle_ref(cve_id, r):
     if 'url' not in r:
        return
     url = r['url']
-    if 'git' not in url and 'lkml.org. not in url:
-        return
-    if 'commit' not in url:
+    if 'git' not in url and 'lkml.org' not in url:
         return
     counter = counter + 1
     try:
