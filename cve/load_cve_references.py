@@ -5,7 +5,15 @@ import requests
 import json
 import sys
 import re
+from splunk_tools import search_splunk
+from splunk_tools import connect_splunk
 
+HOST = "localhost"
+PORT = 8089
+USERNAME = "admin"
+PASSWORD = "faurecia#security"
+
+index = 'cve6' 
 counter = 0
 res = {}
 files_found = 0
@@ -56,7 +64,7 @@ def handle_ref(cve_id, r):
     if 'url' not in r:
        return
     url = r['url']
-    if 'git' not in url:
+    if 'git' not in url and 'lkml.org. not in url:
         return
     if 'commit' not in url:
         return
@@ -97,32 +105,14 @@ def handle_cve(data):
 
 f = open("cve_reference_log.txt", "w")
 
-HOST = "localhost"
-PORT = 8089
-USERNAME = "admin"
-PASSWORD = "faurecia#security"
-
-index = 'cve' 
-service = client.connect(
+service = connect_splunk(
   host=HOST,
   port=PORT,
   username=USERNAME,
   password=PASSWORD)
 
 search = 'search index="' + index +'"'
-job = service.jobs.create(search, max_count=4096)
-while True:
-    while not job.is_ready():
-        pass
-    if job['isDone'] == '1':
-        break
-    sleep(0.05)
-
-kwargs_options = {"count" : 4096}
-reader = results.ResultsReader(job.results(**kwargs_options))
-for item in reader:
-    if '_raw' in item:
-        handle_cve(item['_raw'])
+search_splunk(service, search, 4096, handle_cve)
 
 for cve_id, cve_info in res.items():
     cve_ref = {}
