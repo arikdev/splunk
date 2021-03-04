@@ -16,6 +16,7 @@ CSV_HOME = '/home/manage/splunk/etc/apps/lookup_editor/lookups/'
 CPE_TABLE = 'vul_cpe.csv'
 PRODUCT_TABLE = 'vul_product_table.csv'
 PRODUCT_CPE_TABLE = 'vul_product_cpe.csv'
+CVE_IGNORE = 'vul_cve_ignore.csv'
 INCIDENT_TABLE = 'vul_incidents.csv'
 CPE_COMPILED_FILES_TABLE = 'vul_cpe_compiled_files.csv'
 
@@ -213,6 +214,10 @@ class Cpe_compiled_files(csv.CSV_FILE):
         if source_file not in cpe_entry['files']:
             cpe_entry['files'].append(source_file)
 
+class Cve_ignore_file(csv.CSV_FILE):
+    def implementation(self, tokens):
+        ignore_list.append(tokens[0])
+
 
 class Incident_seq_file(csv.CSV_FILE):
     def implementation(self, tokens):
@@ -264,6 +269,9 @@ def init_db():
 
     cpe_compiled_files = Cpe_compiled_files(CSV_HOME + CPE_COMPILED_FILES_TABLE)
     cpe_compiled_files.process()
+
+    cve_ignore_file = Cve_ignore_file(CSV_HOME + CVE_IGNORE)
+    cve_ignore_file.process()
 
     load_ref()
 
@@ -339,6 +347,8 @@ def __handle_product(product_entry):
         cves = cpe_info['cves']
         for cve in cves:
             cve_id = cve['cve_id']
+            if cve_id in ignore_list:
+                continue
             # No reference for the CVE - nothing to do
             if is_reference_relevant(cve_id, cpe, version, product_id) == False:
                 continue
@@ -395,7 +405,16 @@ def is_reference_relevant(cve_id, cpe, version, product_id):
     global ref_db
 
     if cve_id not in ref_db:
-        return False
+        return True
+
+    found = False
+    for file in ref_db[cve_id]['files']:
+        if '.c' in file:
+            found = True
+            break
+    if not found:
+        return True
+
 
     if cpe not in cpe_compiled_files_db:
         return False
@@ -431,9 +450,13 @@ incident_seq = 0
 product_db = {}
 cpe_db = {}
 ref_db = {}
+ignore_list = []
 cpe_compiled_files_db = {}
 
 init_db()
+
+print('------------------------------------------- list:')
+print(ignore_list)
 
 if debug:
     dump_db()
